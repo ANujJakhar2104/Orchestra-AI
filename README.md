@@ -2,7 +2,6 @@
 
 **Production-ready real-time voice AI with multi-agent personas, hybrid emotion detection, live agent transfer, and dynamic visual UI — all in 1–1.5 second end-to-end latency.**
 
-🔗 **Live Demo:** [https://3.6.92.112.nip.io/](https://3.6.92.112.nip.io/)
 
 ---
 
