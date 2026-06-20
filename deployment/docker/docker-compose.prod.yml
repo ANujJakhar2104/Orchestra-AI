@@ -1,0 +1,69 @@
+# Production docker-compose — AWS Lightsail
+# Images pulled from GHCR (GitHub Container Registry) — no ECR/IAM needed
+#
+# On the server this file lives at: /opt/voice-ai/docker-compose.yml
+# Environment variables are loaded from /opt/voice-ai/.env
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    container_name: voice-ai-caddy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - voice-ai-network
+
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/akkupratap323/voice-ai-backend:latest}
+    container_name: voice-ai-backend
+    restart: always
+    expose:
+      - "7860"
+      - "8765"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - voice-ai-network
+
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/akkupratap323/voice-ai-frontend:latest}
+    container_name: voice-ai-frontend
+    restart: always
+    expose:
+      - "80"
+    environment:
+      - BACKEND_URL=${PUBLIC_URL:-https://3.6.92.112.nip.io}
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - voice-ai-network
+
+networks:
+  voice-ai-network:
+    driver: bridge
+
+volumes:
+  caddy_data:
+  caddy_config:
