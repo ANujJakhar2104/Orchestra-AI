@@ -3279,15 +3279,7 @@ class VoiceScannerApp {
    * Get backend URL
    */
   private getBackendUrl(): string {
-    // @ts-ignore
-    if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_BACKEND_URL) {
-      // @ts-ignore
-      return import.meta.env.VITE_BACKEND_URL;
-    }
-    if ((window as any).__BACKEND_URL__) {
-      return (window as any).__BACKEND_URL__;
-    }
-    return 'http://localhost:7860';
+    return 'https://jakharanuj-orchestra-ai-backend.hf.space';
   }
 
   /**
