@@ -14,8 +14,8 @@
  */
 
 import {
-  RTVIClient,
-  RTVIClientOptions,
+  PipecatClient,
+  PipecatClientOptions,
   RTVIEvent,
 } from '@pipecat-ai/client-js';
 import {
@@ -40,7 +40,7 @@ import { Loader } from './components/Loader';
 type VoiceState = 'idle' | 'listening' | 'thinking' | 'speaking';
 
 class VoiceScannerApp {
-  private rtviClient: RTVIClient | null = null;
+  private rtviClient: PipecatClient | null = null;
   private transport: WebSocketTransport | null = null;
   private botPlayerAnalyser: AnalyserNode | null = null;
   private botPlayerDataArray: Uint8Array | null = null;
@@ -277,12 +277,12 @@ class VoiceScannerApp {
 
     // Fallback persona data
     const fallbackPersonas = [
-      { id: 'receptionist', name: 'Brooke', role: 'General Assistant', description: 'Sharp and friendly generalist — knows a bit about everything', avatar: '/personas/receptionist.webp', tags: ['English', 'Female', 'Generalist'] },
-      { id: 'customer_support', name: 'Blake', role: 'Problem Solver', description: 'Calm and methodical troubleshooter — if it\'s broken, Blake will fix it', avatar: '/personas/customer-support.webp', tags: ['English', 'Male', 'Problem Solver'] },
-      { id: 'indian_support', name: 'Arushi', role: 'Hinglish Assistant', description: 'Warm and witty Hinglish-speaking all-rounder', avatar: '/personas/indian-support.webp', tags: ['Hinglish', 'Female', 'All-Rounder'] },
-      { id: 'sales', name: 'Morgan', role: 'Business Strategist', description: 'Sharp business mind — strategy, growth, and getting deals done', avatar: '/personas/sales.webp', tags: ['English', 'Female', 'Business'] },
-      { id: 'technical', name: 'Daniel', role: 'Tech Expert', description: 'Deep technical expert — coding, systems, AI, and infrastructure', avatar: '/personas/technical.webp', tags: ['English', 'Male', 'Technical'] },
-      { id: 'lifestyle', name: 'Naya', role: 'Lifestyle Coach', description: 'Health, fitness, travel, food, and living well', avatar: '/personas/lifestyle.webp', tags: ['English', 'Female', 'Lifestyle'] },
+      { id: '1', name: 'Aanya', role: 'Support Expert', description: 'Expert support specialist', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Aanya&baseColor=8b5cf6&mouth=smile01', tags: ['support', 'friendly'], color: '#8b5cf6' },
+      { id: '2', name: 'Arjun', role: 'Tech Guru', description: 'Technical expert', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Arjun&baseColor=3b82f6&mouth=smile02', tags: ['technical', 'expert'], color: '#3b82f6' },
+      { id: '3', name: 'Priya', role: 'Sales Lead', description: 'Sales professional', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Priya&baseColor=10b981&mouth=smile01', tags: ['sales', 'leader'], color: '#10b981' },
+      { id: '4', name: 'Serena', role: 'HR Assistant', description: 'HR specialist', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Serena&baseColor=ec4899&mouth=smile02', tags: ['hr', 'assistant'], color: '#ec4899' },
+      { id: '5', name: 'Rohan', role: 'Analyst', description: 'Data analyst', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Rohan&baseColor=f59e0b&mouth=smile01', tags: ['analytics', 'data'], color: '#f59e0b' },
+      { id: '6', name: 'Zara', role: 'Creative Head', description: 'Creative professional', avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=Zara&baseColor=06b6d4&mouth=smile02', tags: ['creative', 'design'], color: '#06b6d4' }
     ];
 
     let personas = fallbackPersonas;
@@ -3323,15 +3323,8 @@ class VoiceScannerApp {
       this.log(`Connecting to ${backendUrl}...`);
 
       this.transport = new WebSocketTransport();
-      const config: RTVIClientOptions = {
+      const config: PipecatClientOptions = {
         transport: this.transport,
-        params: {
-          baseUrl: backendUrl,
-          endpoints: { connect: '/connect' },
-          requestData: {
-            ...(this.selectedPersonaId ? { persona_id: this.selectedPersonaId } : {}),
-          },
-        },
         enableMic: true,
         enableCam: false,
         callbacks: {
@@ -3384,7 +3377,7 @@ class VoiceScannerApp {
             this.setupBotPlayerAnalyser(); // Set up real frequency analysis for bot audio
             this.addTerminalMessage('Voice AI initialized and ready.', 'success');
           },
-          onUserTranscript: (data) => {
+          onUserTranscript: (data: { final: any; text: string; }) => {
             if (data.final) {
               this.log(`You: ${data.text}`);
               // Finalize previous bot bubble before adding user message
@@ -3403,7 +3396,7 @@ class VoiceScannerApp {
               }
             }
           },
-          onBotTranscript: (data) => {
+          onBotTranscript: (data: { text: string; }) => {
             this.log(`Bot: ${data.text}`);
             // [SUBTITLE-SYNC] Disabled: subtitle & transcript now driven by streaming_text
             // from SubtitleSyncProcessor for audio-synced subtitles.
@@ -3421,14 +3414,14 @@ class VoiceScannerApp {
               this.highlightGraphKeywords(this.lastUserQuery, this.accumulatedBotAnswer.trim());
             }, 500);
           },
-          onError: (error) => {
+          onError: (error: any) => {
             this.setCloseButtonEnabled(true); // Re-enable close on error
             const errorMsg = typeof error === 'object' ? JSON.stringify(error) : String(error);
             this.log(`Error: ${errorMsg}`);
             this.addTerminalMessage(errorMsg, 'error');
             console.error('RTVI Error:', error);
           },
-          onServerMessage: (message) => {
+          onServerMessage: (message: any) => {
             try {
               let messageData = null;
               let messageType = null;
@@ -3485,11 +3478,16 @@ class VoiceScannerApp {
         },
       };
 
-      this.rtviClient = new RTVIClient(config);
+      this.rtviClient = new PipecatClient(config);
       this.setupTrackListeners();
 
       await this.rtviClient.initDevices();
-      await this.rtviClient.connect();
+      await this.rtviClient.startBotAndConnect({
+        endpoint: `${backendUrl}/connect`,
+        requestData: {
+          ...(this.selectedPersonaId ? { persona_id: this.selectedPersonaId } : {}),
+        },
+      });
 
     } catch (error) {
       this.isConnecting = false;
