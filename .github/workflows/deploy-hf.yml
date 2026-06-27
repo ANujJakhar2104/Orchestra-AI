@@ -17,4 +17,10 @@ jobs:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
           git remote add hf-space https://jakharanuj:${HF_TOKEN}@huggingface.co/spaces/jakharanuj/orchestra-ai-backend
+          
+          # docs/images ko HF push se exclude karo (backend ko screenshots nahi chahiye)
+          git filter-branch --index-filter \
+            'git rm -r --cached --ignore-unmatch docs/images/' \
+            HEAD
+          
           git push hf-space main --force
