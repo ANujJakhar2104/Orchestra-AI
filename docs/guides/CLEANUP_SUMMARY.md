@@ -1,86 +1,58 @@
-# Project Cleanup Summary
+# OrchestraAI — Project Cleanup Summary
 
-## Date: 2024-12-24
+**Date:** June 2026
+**Status:** Complete
 
-### Changes Made
+## What Was Removed
 
-#### 1. Removed Legacy `src/` Directory
-- **Deleted**: Entire `src/` directory and all its contents
-- **Reason**: Legacy code that was not being used; project now uses `app/` directory exclusively
-- **Files Removed**:
-  - `src/websocket_server.py` - Old WebSocket server
-  - `src/voice_assistant_server.py` - Old server class
-  - `src/core/voice_assistant.py` - Legacy voice assistant
-  - `src/services/*` - All legacy service implementations
-  - `src/config/*` - Old configuration files
+### Legacy AWS/Lightsail Deployment Files
+- `deployment/aws/` — CloudFormation template, EC2/ECS task definitions, deploy scripts
+- `deployment/scripts/` — lightsail-deploy.sh, lightsail-deploy-https.sh
+- `deployment/docker/` Caddyfiles (Caddyfile, Caddyfile.graviton, Caddyfile.prod)
+- `deployment/docker/` docker-compose variants (ghcr, graviton, https, prod)
+- `deployment/docker/a2ui-chatbot-service.code-workspace` — stale workspace file
 
-#### 2. Updated Project Structure
-**Current Active Structure** (using `app/` directory):
-```
-app/
-├── main.py                   # Main entry point
-├── api/
-│   ├── routes.py            # HTTP routes
-│   └── websocket.py         # WebSocket endpoint
-├── core/
-│   ├── voice_assistant.py   # Main orchestrator
-│   ├── server.py            # Server instance
-│   └── connection_manager.py
-├── services/
-│   ├── stt.py               # Deepgram STT
-│   ├── tts.py               # Deepgram TTS
-│   ├── rag.py               # LightRAG service
-│   ├── conversation.py      # Gemini LLM
-│   ├── input_analyzer.py
-│   └── latency.py
-└── config/
-    ├── config.yaml
-    └── loader.py
-```
+### Legacy Docs (Nester/AWS era)
+- `docs/DEPLOYMENT_STRATEGY.md` — AWS ECS Fargate guide (irrelevant)
+- `docs/PROJECT_DOCUMENTATION.md` — Nester bot documentation
 
-#### 3. Updated Dependencies
-- **Fixed**: `scripts/ingest_documents.py` now imports from `app.services.pinecone_rag` instead of `src.services.pinecone_rag_service`
+### Why Removed
+Project migrated from AWS Lightsail/ECS to Hugging Face Spaces (Docker) + Vercel.
+No docker-compose orchestration needed — HF Spaces builds a single Dockerfile directly.
+No Caddyfile needed — HF Spaces handles routing/SSL/domain itself.
 
-#### 4. Updated README.md
-- Updated project structure documentation
-- Fixed installation instructions to use `app/main.py`
-- Updated configuration paths to reflect `app/config/config.yaml`
-- Added current service details:
-  - Deepgram Nova-2 for STT
-  - Deepgram Aura for TTS  
-  - Google Gemini 2.5 Flash for LLM
-  - LightRAG for knowledge retrieval
-- Documented conversation features (automatic greeting & goodbye)
-- Fixed all file paths and commands
+## What Was Added
 
-#### 5. Server Mode
-- **Current**: FastAPI mode only (simplified from dual-mode setup)
-- **Endpoint**: `ws://localhost:7860/ws`
-- **Features**: 
-  - Connection management (max 20 concurrent sessions)
-  - Automatic heartbeat monitoring
-  - CORS support
+### New Deployment Structure
+- `deployment/huggingface/sync-to-space.sh` — git push to HF Space remote
+- `deployment/huggingface/.env.example` — HF Secrets template
+- `deployment/huggingface/DEPLOY.md` — deployment runbook
+- `deployment/vercel/vercel.json` — Vercel config reference
+- `deployment/vercel/DEPLOY.md` — Vercel setup guide
 
-### What Was NOT Changed
-- All `app/` directory code remains unchanged
-- Client code unchanged
-- Configuration files in `app/config/` unchanged
-- All active functionality preserved
+### Updated Docs
+- `docs/DEPLOYMENT.md` — rewritten for HF Spaces + Vercel
+- `docs/PROJECT_STRUCTURE.md` — reflects current OrchestraAI structure
+- `docs/GITHUB_SETUP.md` — HF Spaces git remote + GitHub Actions
+- `docs/RESTRUCTURING_SUMMARY.md` — migration history
 
-### Testing
-✅ Server health check: PASSED
-✅ Server status check: PASSED  
-✅ Import tests: PASSED
-✅ All services loading correctly
+## Current Active Structure
+app/                    # FastAPI + Pipecat backend
 
-### Git Status
-- `src/` directory marked for deletion (D)
-- README.md updated (M)
-- scripts/ingest_documents.py updated (M)
-- All other app/ changes are from previous work (greeting/goodbye features)
+client/                 # Vite/TypeScript frontend
 
-### Next Steps
-1. Review the changes
-2. Test the application thoroughly
-3. Commit changes with message: "chore: remove legacy src/ directory and update documentation"
-4. Consider adding `client/node_modules/` to `.gitignore` to prevent future tracking
+deployment/
+
+docker/              # Dockerfile reference
+
+huggingface/         # HF Spaces deploy scripts
+
+vercel/              # Vercel config reference
+
+docs/                   # Updated documentation
+
+## What Was NOT Changed
+- `app/` — all backend code unchanged
+- `client/` — frontend unchanged
+- `requirements.txt` — unchanged
+- `.env.example` — updated with current API keys

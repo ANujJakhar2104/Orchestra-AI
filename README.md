@@ -2,31 +2,31 @@
 
 **Production-ready real-time voice AI with multi-agent personas, hybrid emotion detection, live agent transfer, and dynamic visual UI — all in 1–1.5 second end-to-end latency.**
 
-**🔴 Live Demo:** [https://orchestra-ai-anuj.vercel.app](https://orchestra-ai-anuj.vercel.app)
+🌐 **Live:** [orchestra-ai-anuj.vercel.app](https://orchestra-ai-anuj.vercel.app)
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 <div align="center">
-  <img src="docs/images/Screenshot 2026-06-26 211913.jpg" width="85%" alt="Persona Selection - Aanya"/>
+  <img src="docs/images/screenshot1.png" width="85%"/>
   <br/><br/>
-  <img src="docs/images/Screenshot 2026-06-26 211925.jpg" width="85%" alt="Persona Selection - Priya"/>
+  <img src="docs/images/screenshot2.png" width="85%"/>
   <br/><br/>
-  <img src="docs/images/Screenshot 2026-06-26 212054.jpg" width="85%" alt="Dashboard and Emotion Analysis"/>
+  <img src="docs/images/screenshot3.png" width="85%"/>
 </div>
 
 ---
 
-## 🚀 What Is This?
+## What Is This?
 
-OrchestraAI is a full-stack voice conversational assistant built on the [Pipecat](https://github.com/pipecat-ai/pipecat) framework. You speak — the AI listens, understands your emotion, thinks, responds with the right voice, and optionally renders a live visual UI card — all in real time.
+OrchestraAI is a full-stack voice conversational assistant built on the [Pipecat](https://github.com/pipecat-ai/pipecat) framework (v0.0.98). You speak — the AI listens, understands your emotion, thinks, responds with the right voice, and optionally renders a live visual UI card — all in real time.
 
-It supports **6 distinct AI agent personas**, each with their own voice, personality, and domain expertise. Agents are aware of each other and can **transfer mid-call** — the old agent says a connecting line, and the new agent picks up with full context of your conversation.
+It supports **6 distinct AI agent personas**, each with their own voice, personality, and domain expertise. Agents are aware of each other and can **transfer mid-call** — the old agent says a connecting line, the new agent picks up with full context of your conversation.
 
 ---
 
-## ✨ Core Features
+## Core Features
 
 ### 6 Expert AI Agents (Fully Interconnected)
 
@@ -42,57 +42,327 @@ Every agent knows every other agent and can transfer you mid-call. Voice changes
 | **Zara** | Lifestyle Coach | Health, fitness, travel, food, self-improvement, relationships | English |
 
 **How live agent transfer works:**
-1. Any agent can call `transfer_to_agent()` mid-conversation.
+1. Any agent can call `transfer_to_agent()` mid-conversation
 2. The old agent speaks a brief handoff line: *"Let me connect you with Rohan — this is his territory."*
-3. The LLM system prompt swaps silently to the new agent's persona.
-4. TTS voice switches in real time via `tts.set_voice(voice_id)` — no reconnect, no reload.
-5. The orb color, avatar, and UI accent all update on the frontend instantly.
-6. The new agent picks up with full context.
+3. The LLM system prompt swaps silently to the new agent's persona
+4. TTS voice switches in real time via `tts.set_voice(voice_id)` — no reconnect, no reload
+5. The orb color, avatar, and UI accent all update on the frontend instantly
+6. The new agent picks up with full context: *"Aanya filled me in — you were asking about distributed caching, right?"*
 
 ---
 
-### 🧠 Hybrid Emotion Detection
+### Hybrid Emotion Detection (Original Research)
 
-A two-channel, weighted fusion emotion detection system that runs non-blocking in the background — adding zero latency to the voice pipeline.
+The core research contribution of this project: a **two-channel, weighted fusion emotion detection system** that runs non-blocking in the background — adding zero latency to the voice pipeline.
 
-* **Channel 1 (Audio):** MSP-PODCAST wav2vec2 model extracts dimensional emotions (arousal, dominance, valence) directly from voice tone.
-* **Channel 2 (Text):** Google Gemini 2.0 Flash analyzes the transcription text for sentiment.
-* **Fusion:** Combines both signals (70% Audio / 30% Text) to detect masked emotions (e.g., sarcasm) and dynamically shifts the AI's response tone (e.g., matching a frustrated user with a calm voice).
+#### Architecture
+
+```
+Audio Frames ──► MSP-PODCAST wav2vec2 ──► arousal, dominance, valence
+                    (70% weight)
+                                         \
+                                          ──► Weighted Fusion ──► Emotion Label ──► Voice Switch
+                                         /
+Text Transcription ──► Groq LLM ──► text sentiment
+                         (30% weight)
+```
+
+#### Channel 1: Audio Emotion (MSP-PODCAST wav2vec2)
+
+- **Model:** `audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`
+- **Training data:** MSP-Podcast v1.7 — real podcast conversations (not acted speech)
+- **Output:** Dimensional emotions — arousal (0–1), dominance (0–1), valence (0–1)
+- **Why dimensional?** Categorical models (happy/sad/angry) trained on acted datasets fail on natural conversational speech. Dimensional models trained on real conversations generalize far better to real-world prosody.
+- **Optimizations for HF Spaces CPU Basic (2 vCPU / 16GB RAM):**
+  - INT8 dynamic quantization → 2–3x faster inference, 75% smaller model footprint
+  - Thread tuning: 2 threads matches vCPU count, prevents CPU thrashing
+  - Periodic GC to prevent memory fragmentation on long sessions
+
+#### Channel 2: Text Sentiment (Groq LLM)
+
+- **Model:** DeepSeek V3 via Groq API
+- **Input:** Raw transcription text
+- **Output:** Sentiment label + confidence score
+- **Role:** Catches masked emotion — someone saying "I'm fine" in a frustrated voice. Audio captures the frustration; text captures the literal words. Fusion resolves the conflict.
+
+#### Fusion Logic
+
+```
+final_emotion = (audio_result × 0.7) + (text_result × 0.3)
+```
+
+Dynamic weight adjustment when confidence is low. Mismatch detection threshold at 0.8 — when audio and text strongly disagree (potential sarcasm), both signals are flagged and the system uses a conservative fallback.
+
+#### Dimensional → Voice Tone Mapping
+
+| Arousal | Valence | Mapped Tone |
+|---------|---------|-------------|
+| High | Low (negative) | frustrated |
+| High | High (positive) | excited |
+| Low | Low (negative) | sad |
+| Low | High (positive) | neutral / calm |
+
+#### Stability System
+
+- Emotions require **2-frame stability** before triggering a voice switch (prevents jitter from transient readings)
+- Detected emotions have a **10-second TTL** — stale readings don't persist across long silences
+- Voice switching is non-blocking: background async tasks, pipeline never waits for emotion inference
 
 ---
 
-### 🎙️ Voice Pipeline
+### Voice Pipeline (Pipecat)
 
-* **VAD:** Silero VAD (conf=0.92) for accurate voice detection.
-* **STT:** Deepgram Nova-3 (streaming).
-* **LLM:** DeepSeek V3 (`deepseek-chat`) with LLM Context Aggregator.
-* **TTS:** Cartesia Sonic-3 (word timestamps + emotion control).
-* **Turn Detection:** SmartTurn v3 ONNX.
+```
+Mic Input
+  │
+  ▼
+[Silero VAD] (conf=0.92 — only clear direct speech triggers)
+  │
+  ▼
+[Deepgram Nova-3 STT] (streaming, 300ms endpointing for SmartTurn)
+  │
+  ▼
+[ToneAwareProcessor] ← MSP-PODCAST + Groq hybrid emotion (background async)
+  │
+  ▼
+[STTMuteFilter] (mutes STT during initial greeting — prevents self-interruption)
+  │
+  ▼
+[SmartTurn v3] (ONNX ML end-of-turn detection — replaces silence heuristics)
+  │
+  ▼
+[LLM Context Aggregator + DeepSeek V3 via Groq]
+  │
+  ├─► call_rag_system()     → LightRAG → Answer + optional A2UI visual card
+  ├─► transfer_to_agent()   → Live agent swap (voice + persona + context)
+  └─► end_conversation()    → Farewell TTS + graceful disconnect
+  │
+  ▼
+[VisualHintProcessor] (word-by-word streaming to frontend for A2UI)
+  │
+  ▼
+[TextFilterProcessor] (strips markdown before TTS)
+  │
+  ▼
+[Cartesia Sonic-3 TTS] (word-level timestamps, emotion voice control)
+  │
+  ▼
+Audio Output
+```
+
+**Key design decisions:**
+- **Silero VAD over Deepgram VAD** — local control; Deepgram VAD caused false interruptions
+- **SmartTurn v3 ONNX** — replaces simple silence detection with ML end-of-turn prediction
+- **Non-blocking emotion** — background async tasks, zero pipeline latency impact
+- **Immediate barge-in** (`min_words=0`) — any speech stops TTS instantly
+- **CPU-only PyTorch** — fits HF Spaces free tier (2 vCPU / 16GB RAM)
+- **Connection pooling** — shared `httpx` async client for LightRAG queries
 
 ---
 
-### 📊 A2UI — Voice-Driven Visual Cards
+### A2UI — Voice-Driven Visual Cards
 
-When the LLM answers a query, it can trigger a **dynamic visual card** rendered in the frontend. Available templates include: `simple-card`, `template-grid`, `timeline`, `contact-card`, `comparison-chart`, `stats-flow-layout`, and more.
+When the LLM answers a query through RAG, it can also trigger a **dynamic visual card** rendered in the frontend — no user action needed. The card appears alongside the voice response.
+
+Template selection uses a 3-tier system:
+1. **Explicit keyword match** — fast, pattern-based detection
+2. **Semantic match** — MiniLM sentence transformer for fuzzy intent matching
+3. **Fallback** — `simple-card` default
+
+Available templates: `simple-card`, `template-grid`, `timeline`, `contact-card`, `comparison-chart`, `stats-flow-layout`, `team-flip-cards`, `service-hover-reveal`, `magazine-hero`, `faq-accordion`, `image-gallery`, `video-gallery`, `sales-dashboard`
 
 ---
 
-## 🏗️ Architecture & Deployment
+### RAG (Retrieval-Augmented Generation)
 
-The project is split into a completely decoupled frontend and backend for maximum scalability:
+Knowledge queries route through **LightRAG** — a graph-based RAG system that understands entity relationships, not just keyword similarity.
 
-```text
-Browser (TypeScript/Vite - Hosted on Vercel)
+- Streaming response via `/query/stream`
+- Non-streaming fallback via `/query`
+- Authenticated with `X-API-Key` header
+- Connection pooling via shared `httpx` async client
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| **Voice Pipeline** | Pipecat v0.0.98 |
+| **STT** | Deepgram Nova-3 |
+| **LLM** | DeepSeek V3 via Groq (`deepseek-chat`) |
+| **TTS** | Cartesia Sonic-3 (word timestamps + emotion control) |
+| **Audio Emotion** | MSP-PODCAST wav2vec2 (`audeering/wav2vec2-large-robust-12-ft-emotion-msp-dim`) |
+| **Text Sentiment** | Groq LLM (DeepSeek V3) |
+| **Fusion** | Custom 70/30 weighted hybrid detector |
+| **RAG** | LightRAG (graph-based) |
+| **Turn Detection** | SmartTurn v3 ONNX |
+| **VAD** | Silero VAD (conf=0.92) |
+| **Backend** | FastAPI + uvicorn |
+| **Frontend** | TypeScript + Vite |
+| **Real-time Transport** | Pipecat RTVI WebSocket |
+| **Backend Hosting** | Hugging Face Spaces (Docker SDK, CPU Basic — free) |
+| **Frontend Hosting** | Vercel (Hobby — free) |
+| **CI/CD** | Push to main → auto-deploy (Vercel) + git push hf-space (HF Spaces) |
+
+---
+
+## Architecture
+
+```
+Browser (TypeScript/Vite) — Vercel
     │
     │  WebSocket (/ws) — Pipecat RTVI Protocol
     │
-FastAPI (app/main.py) — Hosted on Hugging Face Spaces (Docker)
+FastAPI (app/main.py) — Hugging Face Spaces (Docker), port 7860
     │
     ├─ Pipecat Pipeline (per session)
     │   ├─ STT: Deepgram Nova-3
-    │   ├─ LLM: DeepSeek V3
+    │   ├─ LLM: DeepSeek V3 via Groq
     │   ├─ TTS: Cartesia Sonic-3
-    │   ├─ Emotion: HybridEmotionDetector (Audio + Text)
-    │   └─ Turn: SmartTurn v3 ONNX
+    │   ├─ Emotion: HybridEmotionDetector (background async)
+    │   │   ├─ MSP-PODCAST wav2vec2 (audio channel, 70%)
+    │   │   └─ Groq LLM (text channel, 30%)
+    │   ├─ Turn: SmartTurn v3 ONNX
+    │   └─ A2UI: VisualHintProcessor → frontend card render
     │
-    └─ Session Management (Live agent transfer, Context memory)
+    ├─ Session Management
+    │   ├─ ConnectionManager (max 20 concurrent sessions)
+    │   ├─ Per-session VoiceAssistant isolation
+    │   └─ Live agent transfer (in-session swap, no reconnect)
+    │
+    └─ External Services
+        ├─ LightRAG (graph RAG server)
+        ├─ Deepgram (STT streaming API)
+        ├─ Cartesia (TTS API)
+        └─ Groq (LLM + text sentiment API)
+```
+
+---
+
+## Running Locally
+
+### Prerequisites
+
+- Python 3.10+
+- Node.js 18+
+- API keys: `DEEPGRAM_API_KEY`, `GROQ_API_KEY`, `CARTESIA_API_KEY`, `CARTESIA_VOICE_ID`, `GOOGLE_API_KEY`, `LIGHTRAG_API_KEY`, `LIGHTRAG_BASE_URL`
+
+### Backend
+
+```bash
+python -m venv .venv && source .venv/bin/activate  # Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env          # Fill in your API keys
+export PYTHONPATH=$(pwd)
+python -m app.main            # → http://localhost:7860
+```
+
+### Frontend
+
+```bash
+cd client
+npm install
+npm run dev                   # → http://localhost:5173
+npm run build                 # Production build
+npm run typecheck             # TypeScript type checking
+```
+
+### Tests
+
+```bash
+pytest tests/                 # All tests
+pytest tests/unit/            # Unit tests only
+pytest tests/integration/     # Integration tests only
+```
+
+---
+
+## Deployment
+
+### Backend — Hugging Face Spaces
+
+```bash
+./deployment/huggingface/sync-to-space.sh
+# or: git push hf-space main
+```
+
+Requires `Dockerfile` and `README.md` (with `sdk: docker`, `app_port: 7860` frontmatter) at repo root.
+Add API keys via Space → Settings → Variables and secrets.
+
+### Frontend — Vercel
+
+Push to `main` → Vercel auto-builds and deploys.
+Set `VITE_BACKEND_URL=https://jakharanuj-orchestra-ai-backend.hf.space` in Vercel project env vars.
+
+See `deployment/` for full runbooks.
+
+---
+
+## Configuration
+
+All settings live in `app/config/config.yaml`, loaded at startup with `${ENV_VAR}` substitution from `.env`.
+
+| Section | What it controls |
+|---------|-----------------|
+| `conversation.system_prompt` | Default agent (Aanya) system prompt |
+| `personas.agents` | All 6 agent definitions — voice ID, personality, greetings |
+| `server.vad` | VAD confidence and volume thresholds |
+| `server.smart_turn` | SmartTurn ONNX timeout and CPU settings |
+| `server.emotion_detection_enabled` | Toggle hybrid emotion detection |
+| `a2ui` | Template tier mode, confidence threshold, streaming |
+| `stt.config` | Deepgram streaming settings, corrections |
+
+---
+
+## Project Structure
+
+```
+app/
+├── main.py                          # FastAPI entrypoint
+├── core/
+│   ├── voice_assistant.py           # Pipeline assembly + agent transfer wiring
+│   └── server.py                    # WebSocket server + session management
+├── services/
+│   ├── conversation.py              # LLM context, function calling, agent transfer logic
+│   ├── msp_emotion_detector.py      # MSP-PODCAST wav2vec2 audio emotion (INT8 quantized)
+│   ├── hybrid_emotion_detector.py   # 70/30 fusion of audio + text sentiment
+│   ├── llm_text_sentiment.py        # Groq LLM text sentiment
+│   ├── rag.py                       # LightRAG graph RAG integration
+│   └── a2ui/                        # Agentic UI — template selection + rendering
+├── processors/
+│   ├── tone_aware_processor.py      # Emotion detection + Cartesia voice switching
+│   ├── smart_interruption.py        # Context-aware barge-in (disabled — StartFrame bug)
+│   └── text_filter.py               # Strips markdown before TTS
+└── config/
+    ├── config.yaml                  # All configuration (env var substitution)
+    └── loader.py                    # Config loader with ${VAR} substitution
+
+client/src/
+├── app.ts                           # Main app — RTVI client, agent transfer, orb, UI
+├── components/
+│   ├── EmotionAnalysisWidget/       # Live emotion visualization panel
+│   ├── KnowledgeGraphWidget/        # RAG knowledge graph (Sigma.js + Graphology)
+│   ├── SynchronizedAnalysisWidget/  # Topic flow analysis
+│   └── a2ui/                        # A2UI visual card renderers
+└── style.css                        # Agent color theming + transfer animations
+
+deployment/
+├── docker/                          # Dockerfile reference + .dockerignore
+├── huggingface/                     # sync-to-space.sh, .env.example, DEPLOY.md
+└── vercel/                          # vercel.json, DEPLOY.md
+
+infrastructure/
+├── huggingface/                     # Space config reference + setup.py
+└── vercel/                          # Vercel project config reference
+```
+
+---
+
+## Known Limitations
+
+- `SmartInterruptionProcessor` disabled — StartFrame ordering bug (fix in progress)
+- AIC Speech Enhancement disabled — SDK v1/v2 mismatch
+- MSP-PODCAST model falls back to text-only emotion on newer `transformers` versions
+- INT8 quantization not supported on Apple Silicon (M1/M2/M3) — skipped automatically
+- HF Spaces free tier sleeps after 48h inactivity — cold start ~30-60s on next request

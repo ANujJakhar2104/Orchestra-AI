@@ -1,1 +1,0 @@
-# Configuration files for NesterAI Infrastructure
