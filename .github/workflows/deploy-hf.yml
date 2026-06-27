@@ -3,24 +3,36 @@ name: Deploy to Hugging Face Spaces
 on:
   push:
     branches: [main]
+    paths:
+      - 'app/**'
+      - 'data/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+      - 'README.md'
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: Push to Hugging Face Spaces
+      - name: Push only backend files to HF Spaces
         env:
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          git remote add hf-space https://jakharanuj:${HF_TOKEN}@huggingface.co/spaces/jakharanuj/orchestra-ai-backend
-          
-          # docs/images ko HF push se exclude karo (backend ko screenshots nahi chahiye)
-          git filter-branch --index-filter \
-            'git rm -r --cached --ignore-unmatch docs/images/' \
-            HEAD
-          
-          git push hf-space main --force
+          # Sirf backend files wala clean folder banao
+          mkdir hf-deploy
+          cp -r app hf-deploy/
+          cp requirements.txt hf-deploy/
+          cp Dockerfile hf-deploy/
+          cp README.md hf-deploy/
+          [ -d data ] && cp -r data hf-deploy/ || true
+
+          # Us folder ko git repo banao aur push karo
+          cd hf-deploy
+          git init
+          git config user.email "ci@github.com"
+          git config user.name "GitHub Actions"
+          git add .
+          git commit -m "deploy: ${{ github.sha }}"
+          git push https://jakharanuj:${HF_TOKEN}@huggingface.co/spaces/jakharanuj/orchestra-ai-backend main --force
